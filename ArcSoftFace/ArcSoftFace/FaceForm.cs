@@ -9,6 +9,7 @@ using ArcSoftFace.Entity;
 using System.IO;
 using System.Configuration;
 using System.Threading;
+using System.Linq;
 
 namespace ArcSoftFace
 {
@@ -17,28 +18,31 @@ namespace ArcSoftFace
         //引擎Handle
         private IntPtr pEngine = IntPtr.Zero;
 
-        //保存右侧图片路径
+        //保存左侧图片路径
         private string image1Path;
 
-        //右侧图片人脸特征
+        //左侧图片人脸特征
         private IntPtr image1Feature;
 
         //保存对比图片的列表
         private List<string> imagePathList = new List<string>();
 
-        //左侧图库人脸特征列表
+        //image图片缓存
+        private List<Image> imageList = new List<Image>();
+
+        //右侧图库人脸特征列表
         private List<IntPtr> imagesFeatureList = new List<IntPtr>();
 
         public FaceForm()
         {
             InitializeComponent();
-            InitEngines();
+            InitEngine();
         }
 
         /// <summary>
         /// 初始化引擎
         /// </summary>
-        private void InitEngines()
+        private void InitEngine()
         {
             //读取配置文件
             AppSettingsReader reader = new AppSettingsReader();
@@ -75,7 +79,7 @@ namespace ArcSoftFace
             {
                 if (ex.Message.IndexOf("无法加载 DLL") > -1)
                 {
-                    MessageBox.Show("请将sdk相关DLL放入bin对应的x86或x64下的文件夹中!");
+                    MessageBox.Show("请选择非Any CPU模式!");
                 }
                 else
                 {
@@ -87,26 +91,19 @@ namespace ArcSoftFace
 
             //初始化引擎
             uint detectMode = DetectionMode.ASF_DETECT_MODE_IMAGE;
-            //检测脸部的角度优先值
             int detectFaceOrientPriority = ASF_OrientPriority.ASF_OP_0_HIGHER_EXT;
-            //人脸在图片中所占比例，如果需要调整检测人脸尺寸请修改此值，有效数值为2-32
             int detectFaceScaleVal = 16;
-            //最大需要检测的人脸个数
             int detectFaceMaxNum = 5;
-            //引擎初始化时需要初始化的检测功能组合
             int combinedMask = FaceEngineMask.ASF_FACE_DETECT | FaceEngineMask.ASF_FACERECOGNITION | FaceEngineMask.ASF_AGE | FaceEngineMask.ASF_GENDER | FaceEngineMask.ASF_FACE3DANGLE;
-            //初始化引擎，正常值为0，其他返回值请参考http://ai.arcsoft.com.cn/bbs/forum.php?mod=viewthread&tid=19&_dsign=dbad527e
             retCode = ASFFunctions.ASFInitEngine(detectMode, detectFaceOrientPriority, detectFaceScaleVal, detectFaceMaxNum, combinedMask, ref pEngine);
             Console.WriteLine("InitEngine Result:" + retCode);
-            AppendText((retCode == 0) ? "引擎初始化成功!\n" : string.Format("引擎初始化失败!错误码为:{0}\n", retCode));
         }
 
         /// <summary>
-        /// “选择识别图片”按钮事件
+        /// “选择图片”按钮事件
         /// </summary>
         private void ChooseImg(object sender, EventArgs e)
         {
-            lblCompareInfo.Text = "";
             if (pEngine == IntPtr.Zero)
             {
                 MessageBox.Show("请先初始化引擎!");
@@ -120,7 +117,6 @@ namespace ArcSoftFace
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
                 DateTime detectStartTime = DateTime.Now;
-                AppendText(string.Format("------------------------------开始检测，时间:{0}------------------------------\n", detectStartTime.ToString("yyyy-MM-dd HH:mm:ss:ms")));
                 image1Path = openFileDialog.FileName;
 
                 //获取文件，拒绝过大的图片
@@ -129,40 +125,24 @@ namespace ArcSoftFace
                 if (fileInfo.Length > maxSize)
                 {
                     MessageBox.Show("图像文件最大为2MB，请压缩后再导入!");
-                    AppendText(string.Format("------------------------------检测结束，时间:{0}------------------------------\n", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss:ms")));
-                    AppendText("\n");
                     return;
                 }
 
                 Image srcImage = Image.FromFile(image1Path);
-                //调整图像宽度，需要宽度为4的倍数
-                srcImage = ImageUtil.ScaleImage(srcImage, picImageCompare.Width, picImageCompare.Height);
-                //调整图片数据，非常重要
+                //调整图像的宽度
+                srcImage = ImageUtil.ScaleImage(srcImage, picture1.Width, picture1.Height);
                 ImageInfo imageInfo = ImageUtil.ReadBMP(srcImage);
-                //人脸检测
                 ASF_MultiFaceInfo multiFaceInfo = FaceUtil.DetectFace(pEngine, imageInfo);
-                //年龄检测
                 ASF_AgeInfo ageInfo = FaceUtil.AgeEstimation(pEngine, imageInfo, multiFaceInfo);
-                //性别检测
                 ASF_GenderInfo genderInfo = FaceUtil.GenderEstimation(pEngine, imageInfo, multiFaceInfo);
-                //3DAngle检测
                 ASF_Face3DAngle face3DAngleInfo = FaceUtil.Face3DAngleDetection(pEngine, imageInfo, multiFaceInfo);
                 MemoryUtil.Free(imageInfo.imgData);
 
                 if (multiFaceInfo.faceNum < 1)
                 {
-                    image1Feature = IntPtr.Zero;
-                    picImageCompare.Image = srcImage;
-                    AppendText(string.Format("{0} - 未检测出人脸!\n\n", DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss")));
-                    AppendText(string.Format("------------------------------检测结束，时间:{0}------------------------------\n", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss:ms")));
-                    AppendText("\n");
+                    MessageBox.Show("未检测出人脸!");
                     return;
                 }
-
-                MRECT temp = new MRECT();
-                int ageTemp = 0;
-                int genderTemp = 0;
-                int rectTemp = 0;
 
                 //标记出检测到的人脸
                 for (int i = 0; i < multiFaceInfo.faceNum; i++)
@@ -172,42 +152,20 @@ namespace ArcSoftFace
                     int age = MemoryUtil.PtrToStructure<int>(ageInfo.ageArray + MemoryUtil.SizeOf<int>() * i);
                     int gender = MemoryUtil.PtrToStructure<int>(genderInfo.genderArray + MemoryUtil.SizeOf<int>() * i);
 
-                    //roll为侧倾角，pitch为俯仰角，yaw为偏航角
+                    //以下角度为浮点型欧拉角，roll为侧倾角，pitch为俯仰角，yaw为偏航角
                     float roll = MemoryUtil.PtrToStructure<float>(face3DAngleInfo.roll + MemoryUtil.SizeOf<float>() * i);
                     float pitch = MemoryUtil.PtrToStructure<float>(face3DAngleInfo.pitch + MemoryUtil.SizeOf<float>() * i);
                     float yaw = MemoryUtil.PtrToStructure<float>(face3DAngleInfo.yaw + MemoryUtil.SizeOf<float>() * i);
 
-                    int rectWidth = rect.right - rect.left;
-                    int rectHeight = rect.bottom - rect.top;
-
-                    //查找最大人脸
-                    if (rectWidth * rectHeight > rectTemp)
-                    {
-                        rectTemp = rectWidth * rectHeight;
-                        temp = rect;
-                        ageTemp = age;
-                        genderTemp = gender;
-                    }
-
-
-
-                    //srcImage = ImageUtil.MarkRectAndString(srcImage, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, age, gender);
-                    AppendText(string.Format("{0} - 人脸坐标:[left:{1},top:{2},right:{3},bottom:{4},orient:{5},roll:{6},pitch:{7},yaw:{8}] Age:{9} Gender:{10}\n", DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"), rect.left, rect.top, rect.right, rect.bottom, orient, roll, pitch, yaw, age, gender));
+                    srcImage = ImageUtil.MarkRectAndString(srcImage, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, age, gender);
                 }
 
-                srcImage = ImageUtil.MarkRectAndString(srcImage, temp.left, temp.top, temp.right - temp.left, temp.bottom - temp.top, ageTemp, genderTemp);
-
-
-                AppendText(string.Format("{0} - 人脸数量:{1}\n\n", DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"), multiFaceInfo.faceNum));
-
                 //显示标记后的图像
-                picImageCompare.Image = srcImage;
+                picture1.Image = srcImage;
                 DateTime detectEndTime = DateTime.Now;
-                AppendText(string.Format("------------------------------检测结束，时间:{0}------------------------------\n", detectEndTime.ToString("yyyy-MM-dd HH:mm:ss:ms")));
-                AppendText("\n");
                 ASF_SingleFaceInfo singleFaceInfo = new ASF_SingleFaceInfo();
                 //提取人脸特征
-                image1Feature = FaceUtil.ExtractFeature(pEngine, srcImage, out singleFaceInfo);
+                image1Feature = FaceUtil.ExtractFeature(pEngine, srcImage, out singleFaceInfo)[0];
 
             }
         }
@@ -215,7 +173,7 @@ namespace ArcSoftFace
 
         private object locker = new object();
         /// <summary>
-        /// 人脸库图片选择按钮事件
+        /// 右边多个图片选择按钮事件
         /// </summary>
         private void ChooseMultiImg(object sender, EventArgs e)
         {
@@ -223,20 +181,19 @@ namespace ArcSoftFace
             {
                 OpenFileDialog openFileDialog = new OpenFileDialog();
                 openFileDialog.Title = "选择图片";
-                openFileDialog.Filter = "图片文件|*.bmp;*.jpg;*.jpeg;*.png";
+                openFileDialog.Filter = "图片文件|*.bmp;*.jpg;*.jpeg;*.png;*.tif";
                 openFileDialog.Multiselect = true;
                 openFileDialog.FileName = string.Empty;
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    List<string> imagePathListTemp = new List<string>();
                     var numStart = imagePathList.Count;
-                    int isGoodImage = 0;
+
 
                     //保存图片路径并显示
                     string[] fileNames = openFileDialog.FileNames;
                     for (int i = 0; i < fileNames.Length; i++)
                     {
-                        imagePathListTemp.Add(fileNames[i]);
+                        imagePathList.Add(fileNames[i]);
                     }
 
                     //人脸检测以及提取人脸特征
@@ -248,66 +205,46 @@ namespace ArcSoftFace
                             chooseMultiImgBtn.Enabled = false;
                             matchBtn.Enabled = false;
                             btnClearFaceList.Enabled = false;
-                            chooseImgBtn.Enabled = false;
                         }));
 
                         //人脸检测和剪裁
-                        for (int i = 0; i < imagePathListTemp.Count; i++)
+                        for (int i = numStart; i < imagePathList.Count; i++)
                         {
-                            Image image = Image.FromFile(imagePathListTemp[i]);
+                            Image image = Image.FromFile(imagePathList[i]);
                             ASF_MultiFaceInfo multiFaceInfo = FaceUtil.DetectFace(pEngine, image);
 
                             if (multiFaceInfo.faceNum > 0)
                             {
-                                imagePathList.Add(imagePathListTemp[i]);
                                 MRECT rect = MemoryUtil.PtrToStructure<MRECT>(multiFaceInfo.faceRects);
                                 image = ImageUtil.CutImage(image, rect.left, rect.top, rect.right, rect.bottom);
-                            }
-                            else
-                            {
-                                continue;
                             }
 
                             this.Invoke(new Action(delegate
                             {
                                 if (image == null)
                                 {
-                                    image = Image.FromFile(imagePathListTemp[i]);
+                                    image = Image.FromFile(imagePathList[i]);
                                 }
-                                imageLists.Images.Add(imagePathListTemp[i], image);
-                                imageList.Items.Add((numStart + isGoodImage) + "号", imagePathListTemp[i]);
-                                isGoodImage += 1;
-                                image = null;
+                                imageList.Add(image);
+                                imageList1.Images.Add(imagePathList[i], image);
+                                listView1.Items.Add(i + "号", imagePathList[i]);
                             }));
                         }
-
 
                         //提取人脸特征
                         for (int i = numStart; i < imagePathList.Count; i++)
                         {
                             ASF_SingleFaceInfo singleFaceInfo = new ASF_SingleFaceInfo();
-                            IntPtr feature = FaceUtil.ExtractFeature(pEngine, Image.FromFile(imagePathList[i]), out singleFaceInfo);
-                            this.Invoke(new Action(delegate
-                            {
-                                if (singleFaceInfo.faceRect.left == 0 && singleFaceInfo.faceRect.right == 0)
-                                {
-                                    AppendText(string.Format("{0}号未检测到人脸\r\n", i));
-                                }
-                                else
-                                {
-                                    AppendText(string.Format("已提取{0}号人脸特征值，[left:{1},right:{2},top:{3},bottom:{4},orient:{5}]\r\n", i, singleFaceInfo.faceRect.left, singleFaceInfo.faceRect.right, singleFaceInfo.faceRect.top, singleFaceInfo.faceRect.bottom, singleFaceInfo.faceOrient));
-                                    imagesFeatureList.Add(feature);
-                                }
-                            }));
+                            List<IntPtr> featureList = FaceUtil.ExtractFeature(pEngine, Image.FromFile(imagePathList[i]), out singleFaceInfo);
+                            imagesFeatureList.Add((featureList.Count == 0) ? IntPtr.Zero : featureList[0]);
                         }
-                        imagePathList = imagePathListTemp;
+
                         //允许点击按钮
                         Invoke(new Action(delegate
                         {
                             chooseMultiImgBtn.Enabled = true;
                             matchBtn.Enabled = true;
                             btnClearFaceList.Enabled = true;
-                            chooseImgBtn.Enabled = true;
                         }));
                     }));
 
@@ -320,83 +257,70 @@ namespace ArcSoftFace
         /// </summary>
         private void Form_Closed(object sender, FormClosedEventArgs e)
         {
-            //销毁引擎
+            //卸载引擎
             int retCode = ASFFunctions.ASFUninitEngine(pEngine);
             Console.WriteLine("UninitEngine Result:" + retCode);
         }
 
-        /// <summary>
-        /// 追加公用方法
-        /// </summary>
-        /// <param name="message"></param>
-        private void AppendText(string message)
-        {
-            logBox.AppendText(message);
-        }
-
-        /// <summary>
-        /// 匹配事件
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
         private void matchBtn_Click(object sender, EventArgs e)
         {
-            if (imagesFeatureList.Count == 0)
-            {
-                MessageBox.Show("请注册人脸!", "提示", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
             if (image1Feature == IntPtr.Zero)
             {
-                if (picImageCompare.Image == null)
-                {
-                    MessageBox.Show("请选择识别图!", "提示", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-                else
-                {
-                    MessageBox.Show("比对失败，识别图未提取到特征值!", "提示", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+                MessageBox.Show("请选择左侧图片!", "提示", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            float compareSimilarity = 0f;
-            int compareNum = 0;
-            AppendText(string.Format("------------------------------开始比对，时间:{0}------------------------------\r\n", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss:ms")));
+            if (imagesFeatureList.Count == 0)
+            {
+                MessageBox.Show("请选择右侧对比图!", "提示", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            IList<FaceCompare> faceCompareList = new List<FaceCompare>();
             for (int i = 0; i < imagesFeatureList.Count; i++)
             {
                 IntPtr feature = imagesFeatureList[i];
                 float similarity = 0f;
-                long t1 = DateTime.Now.ToFileTime();
                 int ret = ASFFunctions.ASFFaceFeatureCompare(pEngine, image1Feature, feature, ref similarity);
-                long t2 = DateTime.Now.ToFileTime();
-                AppendText(string.Format("与{0}号比对结果:{1}\r\n", i, similarity));
-                imageList.Items[i].Text = string.Format("{0}号({1})", i, similarity);
-                if (similarity > compareSimilarity)
-                {
-                    compareSimilarity = similarity;
-                    compareNum = i;
-                }
+
+                FaceCompare faceCompare = new FaceCompare();
+                faceCompare.faceID = i;
+                faceCompare.similarity = similarity;
+                faceCompareList.Add(faceCompare);
             }
-            if (compareSimilarity > 0)
+            //根据相似进行倒叙排序
+            faceCompareList = faceCompareList.OrderByDescending(u => u.similarity).ToList();
+
+            //临时变量存储
+            List<string> imagePathListTemp = new List<string>();
+            List<IntPtr> imagesFeatureListTemp = new List<IntPtr>();
+            List<Image> imageListTemp = new List<Image>();
+            //清空当前内容
+            imageList1.Images.Clear();
+            listView1.Items.Clear();
+
+            for (int i = 0; i < faceCompareList.Count; i++)
             {
-                lblCompareInfo.Text = " " + compareNum + "号," + compareSimilarity;
+                int tempI = faceCompareList[i].faceID;
+                imageListTemp.Add(imageList[tempI]);
+                imageList1.Images.Add(imagePathList[tempI], imageList[tempI]);
+                imagePathListTemp.Add(imagePathList[tempI]);
+                listView1.Items.Add(string.Format("{0}号({1})", i, faceCompareList[i].similarity), imagePathList[tempI]);
+                imagesFeatureListTemp.Add(imagesFeatureList[tempI]);
             }
-            AppendText(string.Format("------------------------------比对结束，时间:{0}------------------------------\r\n", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss:ms")));
+            imageList = imageListTemp;
+            imagesFeatureList = imagesFeatureListTemp;
+            imagePathList = imagePathListTemp;
         }
 
-        /// <summary>
-        /// 清除人脸库事件
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
         private void btnClearFaceList_Click(object sender, EventArgs e)
         {
             //清除数据
-            imageLists.Images.Clear();
-            imageList.Items.Clear();
+            imageList1.Images.Clear();
+            listView1.Items.Clear();
             imagesFeatureList.Clear();
             imagePathList.Clear();
+            imageList = new List<Image>();
         }
     }
 }
