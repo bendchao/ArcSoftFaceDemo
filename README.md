@@ -1,16 +1,28 @@
 快速上手：
+
 	1.	安装VS2012环境安装包(vcredist_x86_vs2012.exe)、VS2013环境安装包（vcredist_x86_vs2013.exe）
+	
 	2.	从官网申请sdk  http://www.arcsoft.com.cn/ai/arcface.html  ，下载对应的sdk版本(x86或x64)并解压
+	
 	3.	将libs中的“libarcsoft_face.dll”、“libarcsoft_face_engine.dll”拷贝到工程bin目录的对应平台的debug或release目录下
+	
 	4.	将对应appid和appkey替换App.config文件中对应内容
+	
 	5.	在Debug或者Release中选择配置管理器，选择对应的平台
+	
 	6.	按F5启动程序
+	
 	7.	点击“注册人脸”按钮增加人脸库图片
+	
 	8.	点击“选择识别图”按钮增加人脸图片
+	
 	9.	点击“开始匹配”按钮进行比较
+	
 	10.	根据下面文本框查看相关信息
 
+
 常见问题：
+
 	1.后引擎初始化失败	
 		(1)请选择对应的平台，如x64,x86 
 		(2)删除bin下面对应的asf_install.dat，freesdk_132512.dat；
