@@ -3,7 +3,7 @@
 namespace ArcSoftFace.SDKModels
 {
     /// <summary>
-    /// 3D人脸角度检测结构体，可参考https://jingyan.baidu.com/article/0bc808fc2c0e851bd485b9ce.html进行深入理解
+    /// 3D人脸角度检测结构体，可参考https://ai.arcsoft.com.cn/bbs/forum.php?mod=viewthread&tid=1459&page=1&extra=&_dsign=fd9e1a7a
     /// </summary>
     public struct ASF_Face3DAngle
     {

@@ -11,19 +11,5 @@ namespace ArcSoftFace.SDKModels
         public int top;
         public int right;
         public int bottom;
-
-        public override bool Equals(object obj)
-        {
-            if (!(obj is MRECT))
-            {
-                return false;
-            }
-
-            var mRECT = (MRECT)obj;
-            return left == mRECT.left &&
-                   top == mRECT.top &&
-                   right == mRECT.right &&
-                   bottom == mRECT.bottom;
-        }
     }
 }

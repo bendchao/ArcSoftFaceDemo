@@ -69,7 +69,7 @@ namespace ArcSoftFace.Utils
 
             return null;
         }
-
+        
         /// <summary>
         /// 用矩形框标记图片指定区域
         /// </summary>
@@ -99,38 +99,9 @@ namespace ArcSoftFace.Utils
             {
                 g.Dispose();
             }
+
             return null;
         }
-
-        /// <summary>
-        /// 用矩形框标记图片指定区域
-        /// </summary>
-        /// <param name="image">图片</param>
-        /// <param name="startX">矩形框左上角X坐标</param>
-        /// <param name="startY">矩形框左上角Y坐标</param>
-        /// <param name="width">矩形框宽度</param>
-        /// <param name="height">矩形框高度</param>
-        /// <param name="color">边框颜色</param>
-        public static void MarkRect(ref Bitmap image, int startX, int startY, int width, int height,Color color)
-        {
-            Graphics g = Graphics.FromImage(image);
-            try
-            {
-                Brush brush = new SolidBrush(color);
-                Pen pen = new Pen(brush, 2);
-                pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Dash;
-                g.DrawRectangle(pen, new Rectangle(startX, startY, width, height));
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            finally
-            {
-                g.Dispose();
-            }
-        }
-
 
         /// <summary>
         /// 用矩形框标记图片指定区域，添加年龄和性别标注
@@ -143,7 +114,7 @@ namespace ArcSoftFace.Utils
         /// <param name="age">年龄</param>
         /// <param name="gender">性别</param>
         /// <returns>标记后的图片</returns>
-        public static Image MarkRectAndString(Image image, int startX, int startY, int width, int height, int age = -1, int gender = -1)
+        public static Image MarkRectAndString(Image image, int startX, int startY, int width, int height, int age, int gender)
         {
             Image clone = (Image)image.Clone();
             Graphics g = Graphics.FromImage(clone);
@@ -152,11 +123,20 @@ namespace ArcSoftFace.Utils
                 Brush brush = new SolidBrush(Color.Red);
                 Pen pen = new Pen(brush, 2);
                 pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Dash;
-                g.DrawRectangle(pen, new Rectangle(startX, startY, width, height));
-                if (age != -1 && gender != -1)
+                g.DrawRectangle(pen, new Rectangle(startX < 1 ? 0 : startX, startY < 1 ? 0 : startY, width, height));
+                string genderStr = "";
+                if(gender >= 0)
                 {
-                    g.DrawString(string.Format("Age:{0}   Gender:{1}", age, (gender == 0 ? "男" : "女")), new Font(FontFamily.GenericSerif, 12), brush, startX, (startY >= 20 ? startY - 20 : startY));
+                    if(gender == 0)
+                    {
+                        genderStr = "男";
+                    }
+                    else if (gender == 1)
+                    {
+                        genderStr = "女";
+                    }
                 }
+                g.DrawString(string.Format("Age:{0}   Gender:{1}", age, genderStr), new Font(FontFamily.GenericSerif, 12), brush, startX < 1?0:startX, (startY - 20)< 1?0: startY - 20);
 
                 return clone;
             }
@@ -171,71 +151,6 @@ namespace ArcSoftFace.Utils
 
             return null;
         }
-
-        /// <summary>
-        /// 用矩形框标记图片指定区域，添加年龄和性别标注
-        /// </summary>
-        /// <param name="image">图片</param>
-        /// <param name="startX">矩形框左上角X坐标</param>
-        /// <param name="startY">矩形框左上角Y坐标</param>
-        /// <param name="width">矩形框宽度</param>
-        /// <param name="height">矩形框高度</param>
-        /// <param name="age">年龄</param>
-        /// <param name="gender">性别</param>
-        public static void MarkRectAndString(ref Bitmap image, int startX, int startY, int width, int height, int age = -1, int gender = -1)
-        {
-            Graphics g = Graphics.FromImage(image);
-            try
-            {
-                Brush brush = new SolidBrush(Color.Red);
-                Pen pen = new Pen(brush, 2);
-                pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Dash;
-                g.DrawRectangle(pen, new Rectangle(startX, startY, width, height));
-                if (age != -1 && gender != -1)
-                {
-                    g.DrawString(string.Format("Age:{0}   Gender:{1}", age, (gender == 0 ? "男" : "女")), new Font(FontFamily.GenericSerif, 12), brush, startX, (startY >= 20 ? startY - 20 : startY));
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            finally
-            {
-                g.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// 用矩形框标记图片指定区域，添加年龄和性别标注
-        /// </summary>
-        /// <param name="image">图片</param>
-        /// <param name="startX">矩形框左上角X坐标</param>
-        /// <param name="startY">矩形框左上角Y坐标</param>
-        /// <param name="width">矩形框宽度</param>
-        /// <param name="height">矩形框高度</param>
-        /// <param name="msg">信息</param>
-        public static void MarkRectAndString(ref Bitmap image, int startX, int startY, int width, int height,string msg)
-        {
-            Graphics g = Graphics.FromImage(image);
-            try
-            {
-                Brush brush = new SolidBrush(Color.Red);
-                Pen pen = new Pen(brush, 2);
-                pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Dash;
-                g.DrawRectangle(pen, new Rectangle(startX, startY, width, height));
-                g.DrawString(string.Format("{0}", msg), new Font(FontFamily.GenericSerif, 12), brush, startX, (startY >= 20 ? startY - 20 : startY)); 
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            finally
-            {
-                g.Dispose();
-            }
-        }
-
 
         /// <summary>
         /// 按指定宽高缩放图片
@@ -349,70 +264,6 @@ namespace ArcSoftFace.Utils
                 Console.WriteLine(e);
             }
             return null;
-        }
-
-        /// <summary>
-        /// 计算两个矩形框的重叠面积
-        /// </summary>
-        /// <param name="rect1">矩形框1</param>
-        /// <param name="rect2">矩形框2</param>
-        /// <returns>重叠面积</returns>
-        public static int CalOverlapArea(MRECT rect1, MRECT rect2)
-        {
-            int width = 0;
-            int height = 0;
-            int area = 0;
-
-            //1、不重叠
-            if (rect1.right <= rect2.left || rect2.right <= rect1.left || rect1.top >= rect2.bottom || rect2.top >= rect1.bottom)
-            {
-                return area;
-            }
-
-            //2、包含
-            if (rect1.left <= rect2.left && rect1.top <= rect2.top && rect1.right >= rect2.right && rect1.bottom >= rect2.bottom)
-            {
-                width = rect2.right - rect2.left;
-                height = rect2.bottom - rect2.top;
-                area = width * height;
-                return area;
-            }
-            if (rect2.left <= rect1.left && rect2.top <= rect1.top && rect2.right >= rect1.right && rect2.bottom >= rect1.bottom)
-            {
-                width = rect1.right - rect1.left;
-                height = rect1.bottom - rect1.top;
-                area = width * height;
-                return area;
-            }
-
-            //3、重叠
-            MRECT leftRect = (rect1.left <= rect2.left) ? rect1 : rect2;
-            MRECT rightRect = (rect1.left <= rect2.left) ? rect2 : rect1;
-
-            if (leftRect.top <= rightRect.top && leftRect.bottom >= rightRect.bottom)
-            {
-                width = leftRect.right - rightRect.left;
-                height = rightRect.bottom - rightRect.top;
-
-            }
-            else if (leftRect.top <= rightRect.top && leftRect.bottom <= rightRect.bottom)
-            {
-                width = leftRect.right - rightRect.left;
-                height = leftRect.bottom - rightRect.top;
-            }
-            else if (leftRect.top >= rightRect.top && leftRect.bottom >= rightRect.bottom)
-            {
-                width = leftRect.right - rightRect.left;
-                height = rightRect.bottom - leftRect.top;
-            }
-            else
-            {
-                width = leftRect.right - rightRect.left;
-                height = leftRect.bottom - leftRect.top;
-            }
-
-            area = width * height;
-            return area;
         }
     }
 }
